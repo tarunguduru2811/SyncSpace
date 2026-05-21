@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useWebRTC } from './hooks/useWebRTC';
 import VideoPlayer from './components/VideoPlayer';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, MonitorOff } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, MonitorOff, Copy, Check } from 'lucide-react';
 
 export default function Room() {
     const { id } = useParams();
@@ -17,6 +17,13 @@ export default function Room() {
     const [isAudioMuted, setIsAudioMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [pinnedStreamId, setPinnedStreamId] = useState(null);
+    const [isCopied, setIsCopied] = useState(false);
+
+    const handleCopyLink = () => {
+        navigator.clipboard.writeText(window.location.href);
+        setIsCopied(true);
+        setTimeout(() => setIsCopied(false), 2000);
+    };
 
     const handleToggleAudio = () => {
         const newState = !isAudioMuted;
@@ -72,7 +79,26 @@ export default function Room() {
                     <img src="/logo.png" alt="SyncSpace Logo" style={{ width: '40px', height: '40px', borderRadius: '0.75rem', objectFit: 'cover' }} />
                     <h2 style={{ margin: 0, fontWeight: '700', fontSize: '1.5rem' }}>SyncSpace</h2>
                     <div style={{ height: '24px', width: '1px', background: 'var(--border-color)', margin: '0 0.5rem' }}></div>
-                    <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Room: <span style={{ color: 'var(--primary-color)' }}>{id}</span></span>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        Room: <span style={{ color: 'var(--primary-color)' }}>{id}</span>
+                        <button 
+                            onClick={handleCopyLink}
+                            style={{ 
+                                background: 'transparent', 
+                                border: 'none', 
+                                color: isCopied ? '#10b981' : 'var(--text-secondary)', 
+                                cursor: 'pointer',
+                                padding: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '4px'
+                            }}
+                            title="Copy Invite Link"
+                        >
+                            {isCopied ? <Check size={16} /> : <Copy size={16} />}
+                        </button>
+                    </span>
                 </div>
                 {pinnedStream && (
                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Click the large video to unpin</span>
