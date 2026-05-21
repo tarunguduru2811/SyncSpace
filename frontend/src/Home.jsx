@@ -5,20 +5,21 @@ import { Video, Keyboard } from 'lucide-react';
 
 export default function Home() {
     const [roomId, setRoomId] = useState('');
+    const [userName, setUserName] = useState('');
     const navigate = useNavigate();
 
     // Handle joining an existing room
     const handleJoin = (e) => {
         e.preventDefault();
         if (roomId.trim()) {
-            navigate(`/room/${roomId}`);
+            navigate(`/room/${roomId}`, { state: { userName: userName.trim() || 'Guest' } });
         }
     };
 
     // Handle creating a new, random room
     const handleCreateRoom = () => {
         const newRoomId = Math.random().toString(36).substring(2, 9);
-        navigate(`/room/${newRoomId}`);
+        navigate(`/room/${newRoomId}`, { state: { userName: userName.trim() || 'Guest' } });
     };
 
     return (
@@ -34,6 +35,17 @@ export default function Home() {
 
                 <h1 style={{ marginBottom: '0.5rem', fontSize: '2rem', fontWeight: '700' }}>Premium Video Calls</h1>
                 <p style={{ color: 'var(--text-secondary)', marginBottom: '2.5rem' }}>Connect with anyone, anywhere in crystal clear quality.</p>
+
+                {/* Name Input */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                    <input
+                        type="text"
+                        placeholder="Enter your name..."
+                        value={userName}
+                        onChange={(e) => setUserName(e.target.value)}
+                        style={{ textAlign: 'center', background: 'rgba(255, 255, 255, 0.05)' }}
+                    />
+                </div>
 
                 {/* Join Room Form */}
                 <form onSubmit={handleJoin} style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>

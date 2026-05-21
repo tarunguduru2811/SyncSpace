@@ -49,6 +49,11 @@ io.on("connection", (socket) => {
     socket.on("ice-candidate", (payload) => {
         io.to(payload.target).emit('ice-candidate', payload);
     })
+
+    //Relay peer state changes (mute/video off)
+    socket.on("peer-state-change", (payload) => {
+        socket.to(payload.roomId).emit("peer-state-change", payload);
+    })
 })
 
 const PORT = process.env.PORT || 5000;

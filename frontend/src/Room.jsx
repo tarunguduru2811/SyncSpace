@@ -1,28 +1,35 @@
 // frontend/src/Room.jsx
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useWebRTC } from './hooks/useWebRTC';
 import VideoPlayer from './components/VideoPlayer';
-import { Mic, MicOff, Video, VideoOff, PhoneOff } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, MonitorOff } from 'lucide-react';
 
 export default function Room() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
+    const userName = location.state?.userName || 'Guest';
 
     // Initialize our custom WebRTC hook!
-    const { localStream, remoteStreams, toggleAudio, toggleVideo } = useWebRTC(id);
+    const { localStream, remoteStreams, toggleAudio, toggleVideo, isScreenSharing, screenStream, toggleScreenShare, peerNames, peerStates, broadcastState } = useWebRTC(id, userName);
 
     const [isAudioMuted, setIsAudioMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
+    const [pinnedStreamId, setPinnedStreamId] = useState(null);
 
     const handleToggleAudio = () => {
+        const newState = !isAudioMuted;
         toggleAudio();
-        setIsAudioMuted(!isAudioMuted);
+        setIsAudioMuted(newState);
+        broadcastState(newState, isVideoOff);
     };
 
     const handleToggleVideo = () => {
+        const newState = !isVideoOff;
         toggleVideo();
-        setIsVideoOff(!isVideoOff);
+        setIsVideoOff(newState);
+        broadcastState(isAudioMuted, newState);
     };
 
     const leaveRoom = () => {
@@ -30,29 +37,92 @@ export default function Room() {
         navigate('/');
     };
 
+    // Combine local and remote streams into a single array for easier rendering
+    const allStreams = [
+        { 
+            id: 'local', 
+            stream: isScreenSharing ? screenStream : localStream, 
+            isLocal: !isScreenSharing, 
+            name: userName + ' (You)',
+            isAudioMuted,
+            isVideoOff
+        },
+        ...remoteStreams.map(rs => {
+            const state = peerStates[rs.id] || { isAudioMuted: false, isVideoOff: false };
+            return { 
+                id: rs.id, 
+                stream: rs.stream, 
+                isLocal: false, 
+                name: peerNames[rs.id] || 'Peer',
+                isAudioMuted: state.isAudioMuted,
+                isVideoOff: state.isVideoOff
+            };
+        })
+    ];
+
+    const pinnedStream = pinnedStreamId ? allStreams.find(s => s.id === pinnedStreamId) : null;
+    const unpinnedStreams = pinnedStream ? allStreams.filter(s => s.id !== pinnedStreamId) : allStreams;
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', padding: '1.5rem' }}>
 
             {/* Header */}
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <h2 style={{ margin: 0, fontWeight: '600' }}>Room: <span style={{ color: 'var(--primary-color)' }}>{id}</span></h2>
+                {pinnedStream && (
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Click the large video to unpin</span>
+                )}
             </header>
 
-            {/* Video Grid Layout */}
-            <main style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', alignItems: 'center', justifyContent: 'center' }}>
+            {/* Video Layout */}
+            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem', width: '100%', height: '100%' }}>
+                
+                {pinnedStream ? (
+                    <>
+                        {/* Pinned Video (Large) */}
+                        <div 
+                            style={{ flex: 1, display: 'flex', justifyContent: 'center', cursor: 'pointer' }}
+                            onClick={() => setPinnedStreamId(null)}
+                            title="Click to unpin"
+                        >
+                            <div style={{ width: '100%', maxWidth: '1200px' }}>
+                                <VideoPlayer stream={pinnedStream.stream} isLocal={pinnedStream.isLocal} name={pinnedStream.name} isAudioMuted={pinnedStream.isAudioMuted} isVideoOff={pinnedStream.isVideoOff} />
+                            </div>
+                        </div>
 
-                {/* Local Video */}
-                <div style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
-                    <VideoPlayer stream={localStream} isLocal={true} />
-                </div>
-
-                {/* Remote Videos (Dynamic Mesh Network) */}
-                {remoteStreams.map((remotePeer) => (
-                    <div key={remotePeer.id} style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
-                        <VideoPlayer stream={remotePeer.stream} isLocal={false} />
+                        {/* Thumbnail Grid */}
+                        <div style={{ display: 'flex', gap: '1rem', overflowX: 'auto', padding: '1rem 0', justifyContent: 'center' }}>
+                            {unpinnedStreams.map((peer) => (
+                                <div 
+                                    key={peer.id} 
+                                    style={{ width: '250px', flexShrink: 0, cursor: 'pointer', opacity: 0.7, transition: 'opacity 0.2s', transform: 'scale(0.95)' }}
+                                    onClick={() => setPinnedStreamId(peer.id)}
+                                    onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1)'; }}
+                                    onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.transform = 'scale(0.95)'; }}
+                                    title="Click to pin"
+                                >
+                                    <VideoPlayer stream={peer.stream} isLocal={peer.isLocal} name={peer.name} isAudioMuted={peer.isAudioMuted} isVideoOff={peer.isVideoOff} />
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                ) : (
+                    /* Standard Grid Layout */
+                    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', alignItems: 'center', justifyContent: 'center' }}>
+                        {allStreams.map((peer) => (
+                            <div 
+                                key={peer.id} 
+                                style={{ width: '100%', maxWidth: '800px', margin: '0 auto', cursor: 'pointer', transition: 'transform 0.2s' }}
+                                onClick={() => setPinnedStreamId(peer.id)}
+                                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                title="Click to pin"
+                            >
+                                <VideoPlayer stream={peer.stream} isLocal={peer.isLocal} name={peer.name} isAudioMuted={peer.isAudioMuted} isVideoOff={peer.isVideoOff} />
+                            </div>
+                        ))}
                     </div>
-                ))}
-
+                )}
             </main>
 
             {/* Control Bar (Glassmorphism) */}
@@ -73,6 +143,14 @@ export default function Room() {
                         style={{ background: isVideoOff ? 'rgba(239, 68, 68, 0.2)' : 'rgba(255, 255, 255, 0.1)', color: isVideoOff ? 'var(--danger-color)' : 'white' }}
                     >
                         {isVideoOff ? <VideoOff size={24} /> : <Video size={24} />}
+                    </button>
+
+                    <button
+                        className="btn-icon"
+                        onClick={toggleScreenShare}
+                        style={{ background: isScreenSharing ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.1)', color: isScreenSharing ? 'var(--primary-color)' : 'white' }}
+                    >
+                        {isScreenSharing ? <MonitorOff size={24} /> : <MonitorUp size={24} />}
                     </button>
 
                     <button className="btn-danger" style={{ borderRadius: '3rem', padding: '0.75rem 2rem' }} onClick={leaveRoom}>
