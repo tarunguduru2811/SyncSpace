@@ -1,4 +1,4 @@
-# Premium WebRTC Video Calling App
+# SyncSpace
 
 A modern, real-time group video calling application built from scratch to demonstrate the power of WebRTC Mesh Networking and Socket.io signaling. 
 

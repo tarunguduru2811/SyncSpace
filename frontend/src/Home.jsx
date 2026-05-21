@@ -26,15 +26,27 @@ export default function Home() {
         <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
             <div className="glass-panel" style={{ padding: '3rem', width: '100%', maxWidth: '500px', textAlign: 'center' }}>
 
-                {/* Logo/Icon Container */}
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem' }}>
-                    <div style={{ background: 'var(--primary-color)', padding: '1rem', borderRadius: '1rem', display: 'inline-flex', boxShadow: '0 4px 20px rgba(59, 130, 246, 0.4)' }}>
-                        <Video size={40} color="white" />
-                    </div>
+                {/* Trendy Logo/Icon Container */}
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
+                    <img 
+                        src="/logo.png" 
+                        alt="SyncSpace Logo" 
+                        style={{ width: '120px', height: '120px', borderRadius: '2.5rem', boxShadow: '0 12px 40px rgba(0,0,0,0.4)', objectFit: 'cover' }} 
+                    />
                 </div>
 
-                <h1 style={{ marginBottom: '0.5rem', fontSize: '2rem', fontWeight: '700' }}>Premium Video Calls</h1>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '2.5rem' }}>Connect with anyone, anywhere in crystal clear quality.</p>
+                <h1 style={{ 
+                    marginBottom: '0.5rem', 
+                    fontSize: '3rem', 
+                    fontWeight: '800', 
+                    background: 'linear-gradient(to right, #ffffff, #93c5fd)', 
+                    WebkitBackgroundClip: 'text', 
+                    WebkitTextFillColor: 'transparent', 
+                    letterSpacing: '-0.05em' 
+                }}>
+                    SyncSpace
+                </h1>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '2.5rem', fontSize: '1.1rem', fontWeight: '300' }}>Connect with anyone, anywhere in crystal clear quality.</p>
 
                 {/* Name Input */}
                 <div style={{ marginBottom: '1.5rem' }}>

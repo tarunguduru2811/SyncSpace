@@ -68,7 +68,12 @@ export default function Room() {
 
             {/* Header */}
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <h2 style={{ margin: 0, fontWeight: '600' }}>Room: <span style={{ color: 'var(--primary-color)' }}>{id}</span></h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <img src="/logo.png" alt="SyncSpace Logo" style={{ width: '40px', height: '40px', borderRadius: '0.75rem', objectFit: 'cover' }} />
+                    <h2 style={{ margin: 0, fontWeight: '700', fontSize: '1.5rem' }}>SyncSpace</h2>
+                    <div style={{ height: '24px', width: '1px', background: 'var(--border-color)', margin: '0 0.5rem' }}></div>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: '500' }}>Room: <span style={{ color: 'var(--primary-color)' }}>{id}</span></span>
+                </div>
                 {pinnedStream && (
                     <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Click the large video to unpin</span>
                 )}
