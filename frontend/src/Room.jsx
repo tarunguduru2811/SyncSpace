@@ -10,7 +10,7 @@ export default function Room() {
     const navigate = useNavigate();
 
     // Initialize our custom WebRTC hook!
-    const { localStream, remoteStream, toggleAudio, toggleVideo } = useWebRTC(id);
+    const { localStream, remoteStreams, toggleAudio, toggleVideo } = useWebRTC(id);
 
     const [isAudioMuted, setIsAudioMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
@@ -46,10 +46,12 @@ export default function Room() {
                     <VideoPlayer stream={localStream} isLocal={true} />
                 </div>
 
-                {/* Remote Video */}
-                <div style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
-                    <VideoPlayer stream={remoteStream} isLocal={false} />
-                </div>
+                {/* Remote Videos (Dynamic Mesh Network) */}
+                {remoteStreams.map((remotePeer) => (
+                    <div key={remotePeer.id} style={{ width: '100%', maxWidth: '800px', margin: '0 auto' }}>
+                        <VideoPlayer stream={remotePeer.stream} isLocal={false} />
+                    </div>
+                ))}
 
             </main>
 

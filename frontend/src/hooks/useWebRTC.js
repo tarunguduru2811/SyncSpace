@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 
-// Public STUN servers provided by Google to help peers discover their public IP addresses
+// Public STUN servers
 const ICE_SERVERS = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
@@ -12,81 +12,95 @@ const ICE_SERVERS = {
 
 export function useWebRTC(roomId) {
     const [localStream, setLocalStream] = useState(null);
-    const [remoteStream, setRemoteStream] = useState(null);
+    const [remoteStreams, setRemoteStreams] = useState([]); // Array to hold multiple video streams
 
     const socketRef = useRef(null);
-    const peerConnectionRef = useRef(null);
+    const peersRef = useRef({}); // Dictionary tracking every connection (socketId -> RTCPeerConnection)
 
     useEffect(() => {
-        // 1. Connect to our signaling server
         const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
         socketRef.current = io(backendUrl);
 
         const startConnection = async () => {
             try {
-                // 2. Request access to Camera and Microphone
+                // 1. Get Camera/Mic
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 setLocalStream(stream);
 
-                // 3. Initialize the Peer Connection
-                const pc = new RTCPeerConnection(ICE_SERVERS);
-                peerConnectionRef.current = pc;
+                // Helper function to create a new WebRTC connection for a specific user
+                const createPeer = (userId) => {
+                    const pc = new RTCPeerConnection(ICE_SERVERS);
+                    
+                    // Give them our video/audio
+                    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
-                // Add our local audio/video tracks to the connection
-                stream.getTracks().forEach((track) => {
-                    pc.addTrack(track, stream);
-                });
-
-                // When we receive tracks from the other peer, save them to state
-                pc.ontrack = (event) => {
-                    console.log("Received remote track!");
-                    setRemoteStream(event.streams[0]);
-                };
-
-                // When our browser finds a new network path (ICE Candidate), send it to the room
-                pc.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        socketRef.current.emit('ice-candidate', {
-                            target: roomId,
-                            sender: socketRef.current.id, // Identify ourselves so we don't process our own candidates
-                            candidate: event.candidate,
+                    // When they give us their video, add it to our array
+                    pc.ontrack = (event) => {
+                        console.log("Received remote track from:", userId);
+                        setRemoteStreams((prevStreams) => {
+                            // Avoid adding duplicates if the event fires twice for audio/video
+                            if (prevStreams.some(s => s.id === userId)) return prevStreams;
+                            return [...prevStreams, { id: userId, stream: event.streams[0] }];
                         });
-                    }
+                    };
+
+                    // Send them our network routing info
+                    pc.onicecandidate = (event) => {
+                        if (event.candidate) {
+                            // Now we send ICE candidates directly to the specific user!
+                            socketRef.current.emit('ice-candidate', {
+                                target: userId,
+                                sender: socketRef.current.id,
+                                candidate: event.candidate,
+                            });
+                        }
+                    };
+
+                    return pc;
                 };
 
-                // --- 4. Signaling Event Listeners ---
+                // --- 2. Mesh Networking Signaling Events ---
 
-                // A. When someone joins, create an Offer and send it directly to them
+                // A. A new user enters. Create a connection, generate an Offer, and send it to them.
                 socketRef.current.on('User-connected', async (newUserId) => {
-                    console.log("A new user connected:", newUserId);
+                    console.log("A new user joined the room:", newUserId);
+                    const pc = createPeer(newUserId);
+                    peersRef.current[newUserId] = pc; // Store in our dictionary
+
                     const offer = await pc.createOffer();
                     await pc.setLocalDescription(offer);
-                    console.log("Sending offer to:", newUserId);
-                    // Send offer to the new user, and tell them who we are
                     socketRef.current.emit('offer', { target: newUserId, caller: socketRef.current.id, offer });
                 });
 
-                // B. When we receive an Offer, accept it and reply with an Answer
+                // B. Someone sent us an Offer. Create a connection, accept the offer, and reply with Answer.
                 socketRef.current.on('offer', async (payload) => {
                     console.log("Received offer from:", payload.caller);
+                    
+                    if (!peersRef.current[payload.caller]) {
+                        peersRef.current[payload.caller] = createPeer(payload.caller);
+                    }
+                    const pc = peersRef.current[payload.caller];
+
                     await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
                     const answer = await pc.createAnswer();
                     await pc.setLocalDescription(answer);
-                    console.log("Sending answer to:", payload.caller);
-                    // Send answer back to the caller
-                    socketRef.current.emit('answer', { target: payload.caller, answer });
+                    
+                    socketRef.current.emit('answer', { target: payload.caller, sender: socketRef.current.id, answer });
                 });
 
-                // C. When we receive an Answer, finalize the connection
+                // C. Someone replied to our Offer with their Answer. Finalize their connection.
                 socketRef.current.on('answer', async (payload) => {
-                    console.log("Received answer, setting remote description");
-                    await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+                    console.log("Received answer from:", payload.sender);
+                    const pc = peersRef.current[payload.sender];
+                    if (pc) {
+                        await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+                    }
                 });
 
-                // D. When we receive an ICE candidate from the other peer, add it
+                // D. We received network routing info (ICE Candidate) from someone. Add it to their connection.
                 socketRef.current.on('ice-candidate', async (payload) => {
-                    // Ignore our own candidates that the server broadcasted
-                    if (payload.sender !== socketRef.current.id) {
+                    const pc = peersRef.current[payload.sender];
+                    if (pc) {
                         try {
                             await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
                         } catch (e) {
@@ -95,13 +109,22 @@ export function useWebRTC(roomId) {
                     }
                 });
 
-                // Finally, tell the server we are ready and have joined the room!
+                // E. Cleanup when someone leaves the room
+                socketRef.current.on('User-disconnected', (userId) => {
+                    console.log("User disconnected:", userId);
+                    if (peersRef.current[userId]) {
+                        peersRef.current[userId].close(); // Close the specific WebRTC connection
+                        delete peersRef.current[userId]; // Remove from dictionary
+                    }
+                    // Remove their video from the screen
+                    setRemoteStreams((prev) => prev.filter(streamObj => streamObj.id !== userId));
+                });
+
+                // Finally, tell the server we are ready
                 if (socketRef.current.connected) {
-                    console.log("Joining room with ID:", socketRef.current.id);
                     socketRef.current.emit('join_room', roomId, socketRef.current.id);
                 } else {
                     socketRef.current.on('connect', () => {
-                        console.log("Socket connected, joining room with ID:", socketRef.current.id);
                         socketRef.current.emit('join_room', roomId, socketRef.current.id);
                     });
                 }
@@ -113,21 +136,19 @@ export function useWebRTC(roomId) {
 
         startConnection();
 
-        // Cleanup function when we leave the page
+        // Global cleanup when WE leave the page
         return () => {
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
             }
-            if (peerConnectionRef.current) {
-                peerConnectionRef.current.close();
-            }
+            // Loop through all our connections and close them
+            Object.values(peersRef.current).forEach(pc => pc.close());
             if (socketRef.current) {
                 socketRef.current.disconnect();
             }
         };
     }, [roomId]);
 
-    // Expose helpful functions to toggle media on/off
     const toggleAudio = () => {
         if (localStream) {
             const audioTrack = localStream.getAudioTracks()[0];
@@ -146,5 +167,5 @@ export function useWebRTC(roomId) {
         return false;
     };
 
-    return { localStream, remoteStream, toggleAudio, toggleVideo };
+    return { localStream, remoteStreams, toggleAudio, toggleVideo };
 }
