@@ -23,8 +23,8 @@ export default function Home() {
     };
 
     return (
-        <div style={{ display: 'flex', minHeight: '100vh', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
-            <div className="glass-panel" style={{ padding: '3rem', width: '100%', maxWidth: '500px', textAlign: 'center' }}>
+        <div className="home-container">
+            <div className="glass-panel home-panel">
 
                 {/* Trendy Logo/Icon Container */}
                 <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
@@ -35,15 +35,7 @@ export default function Home() {
                     />
                 </div>
 
-                <h1 style={{ 
-                    marginBottom: '0.5rem', 
-                    fontSize: '3rem', 
-                    fontWeight: '800', 
-                    background: 'linear-gradient(to right, #ffffff, #93c5fd)', 
-                    WebkitBackgroundClip: 'text', 
-                    WebkitTextFillColor: 'transparent', 
-                    letterSpacing: '-0.05em' 
-                }}>
+                <h1 className="home-title">
                     SyncSpace
                 </h1>
                 <p style={{ color: 'var(--text-secondary)', marginBottom: '2.5rem', fontSize: '1.1rem', fontWeight: '300' }}>Connect with anyone, anywhere in crystal clear quality.</p>
@@ -60,7 +52,7 @@ export default function Home() {
                 </div>
 
                 {/* Join Room Form */}
-                <form onSubmit={handleJoin} style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+                <form onSubmit={handleJoin} className="join-form">
                     <div style={{ position: 'relative', flex: 1 }}>
                         <Keyboard size={20} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
                         <input

@@ -49,8 +49,9 @@ export default function Room() {
         { 
             id: 'local', 
             stream: isScreenSharing ? screenStream : localStream, 
-            isLocal: !isScreenSharing, 
-            name: userName + ' (You)',
+            isLocal: true, // Always mute local video (even screen share) to prevent echo
+            isMirrored: !isScreenSharing, // Only mirror the camera, never the screen share
+            name: userName + (isScreenSharing ? "'s Screen" : ' (You)'),
             isAudioMuted,
             isVideoOff
         },
@@ -71,14 +72,16 @@ export default function Room() {
     const unpinnedStreams = pinnedStream ? allStreams.filter(s => s.id !== pinnedStreamId) : allStreams;
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', padding: '1.5rem' }}>
+        <div className="room-container">
 
             {/* Header */}
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <img src="/logo.png" alt="SyncSpace Logo" style={{ width: '40px', height: '40px', borderRadius: '0.75rem', objectFit: 'cover' }} />
-                    <h2 style={{ margin: 0, fontWeight: '700', fontSize: '1.5rem' }}>SyncSpace</h2>
-                    <div style={{ height: '24px', width: '1px', background: 'var(--border-color)', margin: '0 0.5rem' }}></div>
+            <header className="room-header">
+                <div className="room-header-brand">
+                    <img src="/logo.png" alt="SyncSpace Logo" className="room-logo" />
+                    <h2 className="room-title">SyncSpace</h2>
+                </div>
+                
+                <div className="room-header-info">
                     <span style={{ color: 'var(--text-secondary)', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         Room: <span style={{ color: 'var(--primary-color)' }}>{id}</span>
                         <button 
@@ -101,7 +104,7 @@ export default function Room() {
                     </span>
                 </div>
                 {pinnedStream && (
-                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Click the large video to unpin</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', width: '100%', textAlign: 'center' }}>Click the large video to unpin</span>
                 )}
             </header>
 
@@ -117,7 +120,7 @@ export default function Room() {
                             title="Click to unpin"
                         >
                             <div style={{ width: '100%', maxWidth: '1200px' }}>
-                                <VideoPlayer stream={pinnedStream.stream} isLocal={pinnedStream.isLocal} name={pinnedStream.name} isAudioMuted={pinnedStream.isAudioMuted} isVideoOff={pinnedStream.isVideoOff} />
+                                <VideoPlayer stream={pinnedStream.stream} isLocal={pinnedStream.isLocal} isMirrored={pinnedStream.isMirrored} name={pinnedStream.name} isAudioMuted={pinnedStream.isAudioMuted} isVideoOff={pinnedStream.isVideoOff} />
                             </div>
                         </div>
 
@@ -132,14 +135,14 @@ export default function Room() {
                                     onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.transform = 'scale(0.95)'; }}
                                     title="Click to pin"
                                 >
-                                    <VideoPlayer stream={peer.stream} isLocal={peer.isLocal} name={peer.name} isAudioMuted={peer.isAudioMuted} isVideoOff={peer.isVideoOff} />
+                                    <VideoPlayer stream={peer.stream} isLocal={peer.isLocal} isMirrored={peer.isMirrored} name={peer.name} isAudioMuted={peer.isAudioMuted} isVideoOff={peer.isVideoOff} />
                                 </div>
                             ))}
                         </div>
                     </>
                 ) : (
                     /* Standard Grid Layout */
-                    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="video-grid">
                         {allStreams.map((peer) => (
                             <div 
                                 key={peer.id} 
@@ -149,7 +152,7 @@ export default function Room() {
                                 onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                 title="Click to pin"
                             >
-                                <VideoPlayer stream={peer.stream} isLocal={peer.isLocal} name={peer.name} isAudioMuted={peer.isAudioMuted} isVideoOff={peer.isVideoOff} />
+                                <VideoPlayer stream={peer.stream} isLocal={peer.isLocal} isMirrored={peer.isMirrored} name={peer.name} isAudioMuted={peer.isAudioMuted} isVideoOff={peer.isVideoOff} />
                             </div>
                         ))}
                     </div>
@@ -158,7 +161,7 @@ export default function Room() {
 
             {/* Control Bar (Glassmorphism) */}
             <footer style={{ display: 'flex', justifyContent: 'center', padding: '2rem 0' }}>
-                <div className="glass-panel" style={{ display: 'inline-flex', gap: '1rem', padding: '1rem 2rem', borderRadius: '3rem' }}>
+                <div className="glass-panel control-bar-inner">
 
                     <button
                         className="btn-icon"
