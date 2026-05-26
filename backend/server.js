@@ -58,6 +58,12 @@ io.on("connection", (socket) => {
         }
     });
 
+    // Chat Message Event
+    socket.on("send-message", (roomId, messageData) => {
+        // Relay the message to everyone else in the room
+        socket.to(roomId).emit("receive-message", messageData);
+    });
+
     socket.on("disconnect", () => {
         console.log(`Socket disconnected : ${socket.id}`);
         

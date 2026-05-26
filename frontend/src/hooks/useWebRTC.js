@@ -17,6 +17,7 @@ export function useWebRTC(roomId, userName = 'Guest') {
     const [screenStream, setScreenStream] = useState(null);
     const [peerNames, setPeerNames] = useState({}); // Track names of remote peers
     const [peerStates, setPeerStates] = useState({}); // Track mute/video status of remote peers
+    const [messages, setMessages] = useState([]); // Chat messages
     const localMediaState = useRef({ isAudioMuted: false, isVideoOff: false });
 
     const broadcastState = (isAudioMuted, isVideoOff) => {
@@ -35,6 +36,11 @@ export function useWebRTC(roomId, userName = 'Guest') {
     const peersRef = useRef({}); // Dictionary tracking every connection (socketId -> RTCPeerConnection)
 
     useEffect(() => {
+        // Request browser notification permissions
+        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+
         const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
         socketRef.current = io(backendUrl);
 
@@ -162,7 +168,20 @@ export function useWebRTC(roomId, userName = 'Guest') {
                     }));
                 });
 
-                // F. Cleanup when someone leaves the room
+                // F. Listen for Chat Messages
+                socketRef.current.on('receive-message', (messageData) => {
+                    setMessages(prev => [...prev, messageData]);
+                    
+                    // Show browser notification if tab is hidden
+                    if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && document.hidden) {
+                        new Notification(`New message from ${messageData.sender}`, {
+                            body: messageData.text,
+                            icon: '/logo.png'
+                        });
+                    }
+                });
+
+                // G. Cleanup when someone leaves the room
                 socketRef.current.on('User-disconnected', (userId) => {
                     console.log("User disconnected:", userId);
                     if (peersRef.current[userId]) {
@@ -274,5 +293,20 @@ export function useWebRTC(roomId, userName = 'Guest') {
         }
     };
 
-    return { localStream, remoteStreams, toggleAudio, toggleVideo, isScreenSharing, screenStream, toggleScreenShare, peerNames, peerStates, broadcastState };
+    const sendMessage = (text) => {
+        if (socketRef.current?.connected && text.trim()) {
+            const messageData = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                sender: userName,
+                text: text.trim(),
+                timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            // Send to peers
+            socketRef.current.emit('send-message', roomId, messageData);
+            // Add locally
+            setMessages(prev => [...prev, messageData]);
+        }
+    };
+
+    return { localStream, remoteStreams, toggleAudio, toggleVideo, isScreenSharing, screenStream, toggleScreenShare, peerNames, peerStates, broadcastState, messages, sendMessage };
 }

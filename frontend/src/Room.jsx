@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useWebRTC } from './hooks/useWebRTC';
 import VideoPlayer from './components/VideoPlayer';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, MonitorOff, Copy, Check } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, MonitorUp, MonitorOff, Copy, Check, MessageSquare, X } from 'lucide-react';
 
 export default function Room() {
     const { id } = useParams();
@@ -12,12 +12,16 @@ export default function Room() {
     const userName = location.state?.userName || 'Guest';
 
     // Initialize our custom WebRTC hook!
-    const { localStream, remoteStreams, toggleAudio, toggleVideo, isScreenSharing, screenStream, toggleScreenShare, peerNames, peerStates, broadcastState } = useWebRTC(id, userName);
+    const { localStream, remoteStreams, toggleAudio, toggleVideo, isScreenSharing, screenStream, toggleScreenShare, peerNames, peerStates, broadcastState, messages, sendMessage } = useWebRTC(id, userName);
 
     const [isAudioMuted, setIsAudioMuted] = useState(false);
     const [isVideoOff, setIsVideoOff] = useState(false);
     const [pinnedStreamId, setPinnedStreamId] = useState(null);
     const [isCopied, setIsCopied] = useState(false);
+    
+    // Chat states
+    const [isChatOpen, setIsChatOpen] = useState(false);
+    const [chatInput, setChatInput] = useState('');
 
     const handleCopyLink = () => {
         navigator.clipboard.writeText(window.location.href);
@@ -42,6 +46,14 @@ export default function Room() {
     const leaveRoom = () => {
         // Navigating away will unmount the component and automatically trigger the hook's cleanup function
         navigate('/');
+    };
+
+    const handleSendChat = (e) => {
+        e.preventDefault();
+        if (chatInput.trim()) {
+            sendMessage(chatInput);
+            setChatInput('');
+        }
     };
 
     // Combine local and remote streams into a single array for easier rendering
@@ -108,8 +120,10 @@ export default function Room() {
                 )}
             </header>
 
-            {/* Video Layout */}
-            <main style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '2rem', width: '100%', height: '100%' }}>
+            {/* Video Layout and Chat Sidebar Layout */}
+            <div className="room-main-layout">
+                {/* Video Area */}
+                <main className="video-area">
                 
                 {pinnedStream ? (
                     <>
@@ -157,7 +171,55 @@ export default function Room() {
                         ))}
                     </div>
                 )}
-            </main>
+                </main>
+
+                {/* Chat Sidebar */}
+                {isChatOpen && (
+                    <aside className="chat-panel">
+                        <div className="chat-header">
+                            <span>Room Chat</span>
+                            <button onClick={() => setIsChatOpen(false)} style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer' }}>
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="chat-messages">
+                            {messages.length === 0 ? (
+                                <p style={{ color: 'var(--text-secondary)', textAlign: 'center', marginTop: '2rem', fontStyle: 'italic' }}>Say hi to the room!</p>
+                            ) : (
+                                messages.map((msg) => (
+                                    <div key={msg.id} style={{ display: 'flex', flexDirection: 'column' }}>
+                                        <div className="message-meta" style={{ justifyContent: msg.sender === userName ? 'flex-end' : 'flex-start' }}>
+                                            <span>{msg.sender}</span>
+                                            <span>{msg.timestamp}</span>
+                                        </div>
+                                        <div className={`message-bubble ${msg.sender === userName ? 'message-mine' : 'message-others'}`}>
+                                            {msg.text}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        <form onSubmit={handleSendChat} className="chat-input-area">
+                            <input 
+                                type="text" 
+                                className="chat-input" 
+                                placeholder="Type a message..." 
+                                value={chatInput}
+                                onChange={(e) => setChatInput(e.target.value)}
+                            />
+                            <button type="submit" className="btn-send" disabled={!chatInput.trim()}>
+                                <span>Send</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            </button>
+                        </form>
+                    </aside>
+                )}
+            </div>
 
             {/* Control Bar (Glassmorphism) */}
             <footer style={{ display: 'flex', justifyContent: 'center', padding: '2rem 0' }}>
@@ -185,6 +247,14 @@ export default function Room() {
                         style={{ background: isScreenSharing ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.1)', color: isScreenSharing ? 'var(--primary-color)' : 'white' }}
                     >
                         {isScreenSharing ? <MonitorOff size={24} /> : <MonitorUp size={24} />}
+                    </button>
+
+                    <button
+                        className="btn-icon"
+                        onClick={() => setIsChatOpen(!isChatOpen)}
+                        style={{ background: isChatOpen ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.1)', color: isChatOpen ? '#10b981' : 'white' }}
+                    >
+                        <MessageSquare size={24} />
                     </button>
 
                     <button className="btn-danger" style={{ borderRadius: '3rem', padding: '0.75rem 2rem' }} onClick={leaveRoom}>
