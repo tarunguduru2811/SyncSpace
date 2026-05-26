@@ -13,23 +13,64 @@ const io = new Server(server, {
     }
 })
 
+let onlineUsers = {}; // { socketId: username }
+
 io.on("connection", (socket) => {
     console.log(`User Connected : ${socket.id}`);
 
-    //1.User wants to join a specific room
+    // --- LOBBY / DIRECT CALLING EVENTS ---
+    socket.on("login", (username) => {
+        onlineUsers[socket.id] = username;
+        io.emit("online-users", onlineUsers);
+        console.log(`${username} logged in. Online:`, Object.keys(onlineUsers).length);
+    });
+
+    socket.on("call-user", (data) => {
+        // data: { targetId, callerName, callerId }
+        io.to(data.targetId).emit("incoming-call", {
+            callerName: data.callerName,
+            callerId: data.callerId
+        });
+    });
+
+    socket.on("accept-call", (data) => {
+        // data: { callerId, roomId }
+        io.to(data.callerId).emit("call-accepted", { roomId: data.roomId });
+    });
+
+    socket.on("reject-call", (data) => {
+        io.to(data.callerId).emit("call-rejected");
+    });
+
+    // --- ROOM / WEBRTC EVENTS ---
     socket.on("join_room", (roomId, userId) => {
+        socket.roomId = roomId;
+        socket.userId = userId;
         socket.join(roomId);
 
         console.log(`User ${userId} has joined room ${roomId}`);
-
-        //Tell everyone else in that room that a new person has joined
         socket.to(roomId).emit("User-connected", userId);
+        
+        // Remove from online lobby while in a room so they aren't disturbed
+        if (onlineUsers[socket.id]) {
+            delete onlineUsers[socket.id];
+            io.emit("online-users", onlineUsers);
+        }
+    });
 
-        //2.Handle when this user disconnects
-        socket.on("disconnect", () => {
-            console.log(`User disconnected : ${userId}`);
-            socket.to(roomId).emit("User-disconnected", userId);
-        })
+    socket.on("disconnect", () => {
+        console.log(`Socket disconnected : ${socket.id}`);
+        
+        // Lobby Cleanup
+        if (onlineUsers[socket.id]) {
+            delete onlineUsers[socket.id];
+            io.emit("online-users", onlineUsers);
+        }
+
+        // Room Cleanup
+        if (socket.roomId && socket.userId) {
+            socket.to(socket.roomId).emit("User-disconnected", socket.userId);
+        }
     });
 
     //WebRTC Signalling Events
